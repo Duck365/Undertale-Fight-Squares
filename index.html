@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Undertale-Fight-Squares</title>
+    <style>
+        /* Import a blocky, retro pixel font */
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        body {
+            background-color: #111; /* Dark grey outside the game area */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: white;
+            font-family: 'VT323', monospace;
+        }
+
+        /* The main game window */
+        canvas {
+            background-color: #000; /* Pure black void */
+            border: 2px solid #333;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // State machine to toggle between the Menu and the Battle
+        let gameState = 'MENU'; 
+
+        // Font settings matching the stylistic analysis
+        const globalFont = '"VT323", monospace';
+
+        function drawMenu() {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.textAlign = 'center';
+            
+            // Title
+            ctx.font = `60px ${globalFont}`;
+            ctx.fillText('UNDERTALE: SQUARES', canvas.width / 2, 160);
+
+            // Start Button (Static)
+            const btnWidth = 160;
+            const btnHeight = 60;
+            const btnX = (canvas.width / 2) - (btnWidth / 2);
+            const btnY = 300;
+
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(btnX, btnY, btnWidth, btnHeight);
+            
+            ctx.font = `40px ${globalFont}`;
+            ctx.fillText('START', canvas.width / 2, btnY + 42);
+
+            // Instructional text
+            ctx.font = `20px ${globalFont}`;
+            ctx.fillStyle = '#888';
+            ctx.fillText('(Click anywhere to advance to Battle)', canvas.width / 2, 450);
+        }
+
+        function drawBattle() {
+            // 1. The Enemy (Replacing Sans with a Red Square)
+            ctx.fillStyle = '#FF0000';
+            ctx.fillRect(canvas.width / 2 - 40, 50, 80, 80);
+
+            // 2. The Battle Box
+            const boxWidth = 400;
+            const boxHeight = 160;
+            const boxX = (canvas.width / 2) - (boxWidth / 2);
+            const boxY = 220;
+
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+
+            // 3. The Player Soul (Small red square representing the heart inside the box)
+            ctx.fillStyle = '#FF0000';
+            ctx.fillRect(canvas.width / 2 - 8, boxY + (boxHeight / 2) - 8, 16, 16);
+
+            // 4. HUD / Player Stats
+            ctx.fillStyle = '#FFFFFF';
+            ctx.textAlign = 'left';
+            ctx.font = `24px ${globalFont}`;
+            ctx.fillText('PLAYER   LV 19   HP 92/92', boxX, boxY + boxHeight + 35);
+
+            // 5. Action Buttons (FIGHT, ACT, ITEM, MERCY)
+            const buttons = ['FIGHT', 'ACT', 'ITEM', 'MERCY'];
+            const btnY = 430;
+            const btnW = 110;
+            const btnH = 40;
+            const spacing = (canvas.width - (btnW * 4)) / 5; // Calculate even spacing
+
+            ctx.lineWidth = 3;
+            ctx.textAlign = 'center';
+
+            for (let i = 0; i < buttons.length; i++) {
+                const x = spacing + (i * (btnW + spacing));
+                
+                // Style logic: FIGHT is default selection (Yellow), rest are default unselected (Dark Orange)
+                if (buttons[i] === 'FIGHT') {
+                    ctx.strokeStyle = '#FFFF00'; // Yellow border
+                    ctx.fillStyle = '#FFFF00';   // Yellow text
+                } else {
+                    ctx.strokeStyle = '#FF8C00'; // Dark Orange border
+                    ctx.fillStyle = '#FF8C00';   // Dark Orange text
+                }
+
+                ctx.strokeRect(x, btnY, btnW, btnH);
+                ctx.fillText(buttons[i], x + (btnW / 2), btnY + 28);
+            }
+        }
+
+        function gameLoop() {
+            // Clear the screen to pure black every frame
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Render based on current state
+            if (gameState === 'MENU') {
+                drawMenu();
+            } else if (gameState === 'BATTLE') {
+                drawBattle();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Temporary click listener to transition from Menu to Battle Screen
+        canvas.addEventListener('click', () => {
+            if (gameState === 'MENU') {
+                gameState = 'BATTLE';
+            }
+        });
+
+        // Start the rendering loop
+        gameLoop();
+    </script>
+</body>
+</html>
