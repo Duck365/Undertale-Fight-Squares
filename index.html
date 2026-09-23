@@ -5,129 +5,207 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Undertale-Fight-Squares</title>
     <style>
-        /* Import a blocky, retro pixel font */
         @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
-        body {
-            background-color: #111; /* Dark grey outside the game area */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+        body, html {
             margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden; /* Prevents scrollbars */
             color: white;
             font-family: 'VT323', monospace;
         }
 
-        /* The main game window */
         canvas {
-            background-color: #000; /* Pure black void */
-            border: 2px solid #333;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+            display: block;
         }
     </style>
 </head>
 <body>
 
-    <canvas id="gameCanvas" width="640" height="480"></canvas>
+    <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // State machine to toggle between the Menu and the Battle
-        let gameState = 'MENU'; 
+        // Make canvas fill the screen
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
-        // Font settings matching the stylistic analysis
+        // Game State Variables
+        let gameState = 'MENU'; 
+        let menuSelection = 0;   // 0 = START, 1 = KEYBINDS
+        let battleSelection = 0; // 0 = FIGHT, 1 = ACT, 2 = ITEM, 3 = MERCY
         const globalFont = '"VT323", monospace';
 
+        // Input Handling
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+
+            if (gameState === 'MENU') {
+                if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+                    // Toggle between 0 and 1
+                    menuSelection = menuSelection === 0 ? 1 : 0;
+                }
+                if (key === 'z' || key === 'enter') {
+                    if (menuSelection === 0) gameState = 'BATTLE';
+                    if (menuSelection === 1) gameState = 'KEYBINDS';
+                }
+            } 
+            else if (gameState === 'KEYBINDS') {
+                if (key === 'x' || key === 'shift') {
+                    gameState = 'MENU'; // Deselect / Return
+                }
+            } 
+            else if (gameState === 'BATTLE') {
+                if (key === 'arrowleft') {
+                    battleSelection = (battleSelection > 0) ? battleSelection - 1 : 3;
+                }
+                if (key === 'arrowright') {
+                    battleSelection = (battleSelection < 3) ? battleSelection + 1 : 0;
+                }
+                // No selection functionality added yet per instructions
+            }
+        });
+
+        // Drawing Functions
         function drawMenu() {
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+
             ctx.fillStyle = '#FFFFFF';
             ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
             
             // Title
             ctx.font = `60px ${globalFont}`;
-            ctx.fillText('UNDERTALE: SQUARES', canvas.width / 2, 160);
+            ctx.fillText('UNDERTALE: SQUARES', cx, cy - 150);
 
-            // Start Button (Static)
-            const btnWidth = 160;
+            // Menu Buttons (START & KEYBINDS)
+            const options = ['START', 'KEYBINDS'];
+            const btnWidth = 200;
             const btnHeight = 60;
-            const btnX = (canvas.width / 2) - (btnWidth / 2);
-            const btnY = 300;
+            const startY = cy - 20;
+            const spacing = 90;
 
-            ctx.strokeStyle = '#FFFFFF';
-            ctx.lineWidth = 4;
-            ctx.strokeRect(btnX, btnY, btnWidth, btnHeight);
+            for (let i = 0; i < options.length; i++) {
+                const btnY = startY + (i * spacing);
+                
+                if (menuSelection === i) {
+                    ctx.strokeStyle = '#FFFF00'; // Highlight selected
+                    ctx.fillStyle = '#FFFF00';
+                } else {
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.fillStyle = '#FFFFFF';
+                }
+
+                ctx.lineWidth = 4;
+                ctx.strokeRect(cx - (btnWidth / 2), btnY, btnWidth, btnHeight);
+                
+                ctx.font = `40px ${globalFont}`;
+                ctx.fillText(options[i], cx, btnY + (btnHeight / 2) + 4); 
+            }
+        }
+
+        function drawKeybinds() {
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
             
-            ctx.font = `40px ${globalFont}`;
-            ctx.fillText('START', canvas.width / 2, btnY + 42);
+            ctx.font = `50px ${globalFont}`;
+            ctx.fillText('CONTROLS', cx, cy - 100);
 
-            // Instructional text
-            ctx.font = `20px ${globalFont}`;
+            ctx.font = `30px ${globalFont}`;
+            ctx.fillText('ARROW KEYS = MOVE / NAVIGATE', cx, cy - 10);
+            ctx.fillText('Z / ENTER = SELECT', cx, cy + 40);
+            ctx.fillText('X / SHIFT = DESELECT / BACK', cx, cy + 90);
+
             ctx.fillStyle = '#888';
-            ctx.fillText('(Click anywhere to advance to Battle)', canvas.width / 2, 450);
+            ctx.font = `24px ${globalFont}`;
+            ctx.fillText('(Press X or SHIFT to return)', cx, cy + 180);
         }
 
         function drawBattle() {
-            // 1. The Enemy (Replacing Sans with a Red Square)
-            ctx.fillStyle = '#FF0000';
-            ctx.fillRect(canvas.width / 2 - 40, 50, 80, 80);
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
 
-            // 2. The Battle Box
-            const boxWidth = 400;
+            // 1. The Battle Box (Centered)
+            const boxWidth = 560;
             const boxHeight = 160;
-            const boxX = (canvas.width / 2) - (boxWidth / 2);
-            const boxY = 220;
+            const boxX = cx - (boxWidth / 2);
+            const boxY = cy - 20;
 
             ctx.strokeStyle = '#FFFFFF';
             ctx.lineWidth = 4;
             ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
 
-            // 3. The Player Soul (Small red square representing the heart inside the box)
+            // 2. The Enemy (Moved closer to the top of the battle box)
+            const enemySize = 80;
             ctx.fillStyle = '#FF0000';
-            ctx.fillRect(canvas.width / 2 - 8, boxY + (boxHeight / 2) - 8, 16, 16);
+            ctx.fillRect(cx - (enemySize / 2), boxY - enemySize - 10, enemySize, enemySize);
 
-            // 4. HUD / Player Stats
+            // 3. Battle Text inside the box
             ctx.fillStyle = '#FFFFFF';
             ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.font = `32px ${globalFont}`;
+            ctx.fillText('* A geometrical shape has approached you.', boxX + 30, boxY + 30);
+
+            // 4. HUD / Player Stats
             ctx.font = `24px ${globalFont}`;
-            ctx.fillText('PLAYER   LV 19   HP 92/92', boxX, boxY + boxHeight + 35);
+            ctx.fillText('PLAYER   LV 19   HP 92/92', boxX, boxY + boxHeight + 25);
 
             // 5. Action Buttons (FIGHT, ACT, ITEM, MERCY)
             const buttons = ['FIGHT', 'ACT', 'ITEM', 'MERCY'];
-            const btnY = 430;
-            const btnW = 110;
-            const btnH = 40;
-            const spacing = (canvas.width - (btnW * 4)) / 5; // Calculate even spacing
+            const btnY = boxY + boxHeight + 70;
+            const btnW = 120;
+            const btnH = 45;
+            
+            // Calculate total width of all buttons to center them as a group
+            const totalSpacing = 20; 
+            const totalWidth = (btnW * 4) + (totalSpacing * 3);
+            const startX = cx - (totalWidth / 2);
 
             ctx.lineWidth = 3;
             ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
 
             for (let i = 0; i < buttons.length; i++) {
-                const x = spacing + (i * (btnW + spacing));
+                const x = startX + (i * (btnW + totalSpacing));
                 
-                // Style logic: FIGHT is default selection (Yellow), rest are default unselected (Dark Orange)
-                if (buttons[i] === 'FIGHT') {
-                    ctx.strokeStyle = '#FFFF00'; // Yellow border
-                    ctx.fillStyle = '#FFFF00';   // Yellow text
+                if (battleSelection === i) {
+                    ctx.strokeStyle = '#FFFF00'; 
+                    ctx.fillStyle = '#FFFF00';   
                 } else {
-                    ctx.strokeStyle = '#FF8C00'; // Dark Orange border
-                    ctx.fillStyle = '#FF8C00';   // Dark Orange text
+                    ctx.strokeStyle = '#FF8C00'; 
+                    ctx.fillStyle = '#FF8C00';   
                 }
 
                 ctx.strokeRect(x, btnY, btnW, btnH);
-                ctx.fillText(buttons[i], x + (btnW / 2), btnY + 28);
+                ctx.fillText(buttons[i], x + (btnW / 2), btnY + (btnH / 2) + 2);
             }
         }
 
         function gameLoop() {
-            // Clear the screen to pure black every frame
+            // Clear screen
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Render based on current state
+            // Render current state
             if (gameState === 'MENU') {
                 drawMenu();
+            } else if (gameState === 'KEYBINDS') {
+                drawKeybinds();
             } else if (gameState === 'BATTLE') {
                 drawBattle();
             }
@@ -135,14 +213,7 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // Temporary click listener to transition from Menu to Battle Screen
-        canvas.addEventListener('click', () => {
-            if (gameState === 'MENU') {
-                gameState = 'BATTLE';
-            }
-        });
-
-        // Start the rendering loop
+        // Start game loop
         gameLoop();
     </script>
 </body>
