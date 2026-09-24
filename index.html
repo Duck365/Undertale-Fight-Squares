@@ -39,9 +39,13 @@
         resizeCanvas();
 
         // Game State Variables
-        let gameState = 'MENU'; // MENU, KEYBINDS, BATTLE, FIGHT_SELECT, ATTACKING, DAMAGE_DISPLAY
+        // MENU, KEYBINDS, BATTLE, FIGHT_SELECT, ATTACKING, DAMAGE_DISPLAY, 
+        // ACT_SELECT, ACT_OPTIONS, ACT_TEXT, MERCY_SELECT, MERCY_TEXT, VICTORY
+        let gameState = 'MENU'; 
         let menuSelection = 0;   
         let battleSelection = 0; 
+        let actSelection = 0;    // 0 = Check, 1 = Doodle, 2 = Round Off
+        let mercySelection = 0;  // 0 = Spare, 1 = Flee
         const globalFont = '"VT323", monospace';
 
         // Entity Stats
@@ -49,6 +53,12 @@
         let redSquareHP = 3600;
         let playerMaxHP = 92;
         let playerHP = 92;
+
+        // Pacifist / ACT Tracking
+        let checkCount = 0;
+        let pacifistProgress = 0;
+        let canSpare = false;
+        let currentBoxText = '';
 
         // Attack Bar Variables
         let attackBarX = 0;
@@ -61,6 +71,7 @@
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
 
+            // --- MENU STATE ---
             if (gameState === 'MENU') {
                 if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
                     menuSelection = menuSelection === 0 ? 1 : 0;
@@ -70,9 +81,11 @@
                     if (menuSelection === 1) gameState = 'KEYBINDS';
                 }
             } 
+            // --- KEYBINDS STATE ---
             else if (gameState === 'KEYBINDS') {
                 if (key === 'x' || key === 'shift') gameState = 'MENU'; 
             } 
+            // --- MAIN BATTLE MENU ---
             else if (gameState === 'BATTLE') {
                 if (key === 'arrowleft') {
                     battleSelection = (battleSelection > 0) ? battleSelection - 1 : 3;
@@ -81,37 +94,36 @@
                     battleSelection = (battleSelection < 3) ? battleSelection + 1 : 0;
                 }
                 if (key === 'z' || key === 'enter') {
-                    if (battleSelection === 0) gameState = 'FIGHT_SELECT'; // Select FIGHT
+                    if (battleSelection === 0) gameState = 'FIGHT_SELECT';
+                    if (battleSelection === 1) gameState = 'ACT_SELECT';
+                    if (battleSelection === 3) gameState = 'MERCY_SELECT';
                 }
             }
+            // --- FIGHT TARGET SELECT ---
             else if (gameState === 'FIGHT_SELECT') {
-                if (key === 'x' || key === 'shift') {
-                    gameState = 'BATTLE'; // Go back to main battle menu
-                }
+                if (key === 'x' || key === 'shift') gameState = 'BATTLE';
                 if (key === 'z' || key === 'enter') {
-                    // Start Attack Sequence
                     gameState = 'ATTACKING';
-                    attackBarX = (canvas.width / 2) - 270; // Start at left edge of the box
+                    attackBarX = (canvas.width / 2) - 270;
                 }
             }
+            // --- ATTACK MINIGAME ---
             else if (gameState === 'ATTACKING') {
                 if (key === 'z' || key === 'enter') {
-                    // Stop bar and calculate damage
                     const cx = canvas.width / 2;
                     const distance = Math.abs(attackBarX - cx);
                     
-                    // Damage Scaling based on distance from center
                     if (distance <= 15) {
-                        attackDamage = 180; // Perfect Hit (180 degrees)
+                        attackDamage = 180;
                         isPerfectHit = true;
                     } else if (distance <= 75) {
-                        attackDamage = 90; // Good Hit (Right Angle)
+                        attackDamage = 90;
                         isPerfectHit = false;
                     } else if (distance <= 200) {
-                        attackDamage = 20; // Weak Hit
+                        attackDamage = 20;
                         isPerfectHit = false;
                     } else {
-                        attackDamage = 0; // Miss
+                        attackDamage = 0;
                         isPerfectHit = false;
                     }
 
@@ -119,8 +131,92 @@
                     if (redSquareHP < 0) redSquareHP = 0;
 
                     gameState = 'DAMAGE_DISPLAY';
-                    displayTimer = 60; // Show damage for 60 frames (~1 second)
+                    displayTimer = 60;
                 }
+            }
+            // --- ACT TARGET SELECT ---
+            else if (gameState === 'ACT_SELECT') {
+                if (key === 'x' || key === 'shift') gameState = 'BATTLE';
+                if (key === 'z' || key === 'enter') {
+                    gameState = 'ACT_OPTIONS';
+                    actSelection = 0;
+                }
+            }
+            // --- ACT OPTIONS MENU ---
+            else if (gameState === 'ACT_OPTIONS') {
+                if (key === 'x' || key === 'shift') gameState = 'ACT_SELECT';
+                
+                if (key === 'arrowleft' || key === 'arrowup') {
+                    actSelection = (actSelection > 0) ? actSelection - 1 : 2;
+                }
+                if (key === 'arrowright' || key === 'arrowdown') {
+                    actSelection = (actSelection < 2) ? actSelection + 1 : 0;
+                }
+
+                if (key === 'z' || key === 'enter') {
+                    if (actSelection === 0) {
+                        // CHECK
+                        if (checkCount === 0) {
+                            currentBoxText = '* RED SQUARE - 3600 HP 10 DEF\n* A perfectly balanced shape.';
+                        } else {
+                            currentBoxText = '* Red Square is obsessed with balance, angles, and perfection.\n* It views you as an asymmetrical anomaly that needs to be flattened.';
+                        }
+                        checkCount++;
+                    } 
+                    else if (actSelection === 1) {
+                        // DOODLE
+                        pacifistProgress++;
+                        currentBoxText = '* You drew squiggly lines outside the grid.\n* Red Square looks disturbed by the sudden asymmetry!';
+                    } 
+                    else if (actSelection === 2) {
+                        // ROUND OFF
+                        pacifistProgress++;
+                        currentBoxText = '* You attempted to sand down Red Square\'s sharp 90 degree corners.\n* Its sharp outline softened slightly!';
+                    }
+
+                    if (pacifistProgress >= 5) {
+                        canSpare = true;
+                    }
+
+                    gameState = 'ACT_TEXT';
+                }
+            }
+            // --- ACT TEXT DISPLAY ---
+            else if (gameState === 'ACT_TEXT') {
+                if (key === 'z' || key === 'enter') gameState = 'BATTLE';
+            }
+            // --- MERCY MENU ---
+            else if (gameState === 'MERCY_SELECT') {
+                if (key === 'x' || key === 'shift') gameState = 'BATTLE';
+
+                if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
+                    mercySelection = mercySelection === 0 ? 1 : 0;
+                }
+
+                if (key === 'z' || key === 'enter') {
+                    if (mercySelection === 0) {
+                        // SPARE
+                        if (canSpare) {
+                            currentBoxText = '* YOU WON!\n* You earned 0 EXP and 0 gold.';
+                            gameState = 'VICTORY';
+                        } else {
+                            currentBoxText = '* Red Square is not ready to accept your mercy yet.';
+                            gameState = 'MERCY_TEXT';
+                        }
+                    } else if (mercySelection === 1) {
+                        // FLEE
+                        currentBoxText = '* Escaping is not an option.';
+                        gameState = 'MERCY_TEXT';
+                    }
+                }
+            }
+            // --- MERCY TEXT DISPLAY ---
+            else if (gameState === 'MERCY_TEXT') {
+                if (key === 'z' || key === 'enter') gameState = 'BATTLE';
+            }
+            // --- VICTORY STATE ---
+            else if (gameState === 'VICTORY') {
+                if (key === 'z' || key === 'enter') gameState = 'MENU';
             }
         });
 
@@ -130,7 +226,6 @@
                 attackBarX += attackBarSpeed;
                 const boxRightEdge = (canvas.width / 2) + 270;
                 
-                // If bar goes past the box, it's a miss
                 if (attackBarX > boxRightEdge) {
                     attackDamage = 0;
                     isPerfectHit = false;
@@ -140,7 +235,6 @@
             } else if (gameState === 'DAMAGE_DISPLAY') {
                 displayTimer--;
                 if (displayTimer <= 0) {
-                    // End of turn logic will go here. For now, return to BATTLE menu.
                     gameState = 'BATTLE';
                 }
             }
@@ -218,20 +312,23 @@
             ctx.lineWidth = 4;
             ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
 
-            // Enemy
+            // Enemy Sprite
             const enemySize = 80;
             const enemyX = cx - (enemySize / 2);
             const enemyY = boxY - enemySize - 10;
-            ctx.fillStyle = '#FF0000';
-            ctx.fillRect(enemyX, enemyY, enemySize, enemySize);
+            
+            if (gameState !== 'VICTORY') {
+                ctx.fillStyle = '#FF0000';
+                ctx.fillRect(enemyX, enemyY, enemySize, enemySize);
 
-            // Health Bar Above Enemy (Optional, visible for debugging/style)
-            ctx.fillStyle = '#FF0000';
-            ctx.fillRect(cx - 40, enemyY - 15, 80, 5);
-            ctx.fillStyle = '#00FF00';
-            ctx.fillRect(cx - 40, enemyY - 15, 80 * (redSquareHP / redSquareMaxHP), 5);
+                // Enemy HP Bar
+                ctx.fillStyle = '#FF0000';
+                ctx.fillRect(cx - 40, enemyY - 15, 80, 5);
+                ctx.fillStyle = '#00FF00';
+                ctx.fillRect(cx - 40, enemyY - 15, 80 * (redSquareHP / redSquareMaxHP), 5);
+            }
 
-            // Text/Graphics inside the box depending on state
+            // Box Text & Sub-menu Rendering
             ctx.fillStyle = '#FFFFFF';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
@@ -240,40 +337,78 @@
             if (gameState === 'BATTLE') {
                 ctx.fillText('* A geometrical shape has approached you.', boxX + 30, boxY + 30);
             } 
-            else if (gameState === 'FIGHT_SELECT') {
+            else if (gameState === 'FIGHT_SELECT' || gameState === 'ACT_SELECT') {
+                if (canSpare) ctx.fillStyle = '#FFFF00';
+                else ctx.fillStyle = '#FFFFFF';
+                
                 ctx.fillText('* Red Square', boxX + 50, boxY + 30);
-                // Simple selector heart indicator
+                
                 ctx.fillStyle = '#FF0000';
                 ctx.fillText('♥', boxX + 25, boxY + 30);
             }
+            else if (gameState === 'ACT_OPTIONS') {
+                const actOpts = ['* Check', '* Doodle', '* Round Off'];
+                const positions = [
+                    { x: boxX + 50, y: boxY + 30 },
+                    { x: boxX + 280, y: boxY + 30 },
+                    { x: boxX + 50, y: boxY + 80 }
+                ];
+
+                for (let i = 0; i < actOpts.length; i++) {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillText(actOpts[i], positions[i].x, positions[i].y);
+                    
+                    if (actSelection === i) {
+                        ctx.fillStyle = '#FF0000';
+                        ctx.fillText('♥', positions[i].x - 25, positions[i].y);
+                    }
+                }
+            }
+            else if (gameState === 'ACT_TEXT' || gameState === 'MERCY_TEXT' || gameState === 'VICTORY') {
+                const lines = currentBoxText.split('\n');
+                for (let i = 0; i < lines.length; i++) {
+                    ctx.fillText(lines[i], boxX + 30, boxY + 30 + (i * 40));
+                }
+            }
+            else if (gameState === 'MERCY_SELECT') {
+                if (canSpare) ctx.fillStyle = '#FFFF00';
+                else ctx.fillStyle = '#FFFFFF';
+                ctx.fillText('* Spare', boxX + 50, boxY + 30);
+
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillText('* Flee', boxX + 50, boxY + 80);
+
+                ctx.fillStyle = '#FF0000';
+                const heartY = (mercySelection === 0) ? boxY + 30 : boxY + 80;
+                ctx.fillText('♥', boxX + 25, heartY);
+            }
             else if (gameState === 'ATTACKING' || gameState === 'DAMAGE_DISPLAY') {
-                // Draw Attack Reticle (Eye shape)
+                // Target Reticle
                 ctx.strokeStyle = '#FFFFFF';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.ellipse(cx, boxY + (boxHeight / 2), boxWidth / 2 - 20, boxHeight / 2 - 20, 0, 0, 2 * Math.PI);
                 ctx.stroke();
 
-                // Draw Center target line
+                // Target Line
                 ctx.fillStyle = '#00FF00';
                 ctx.fillRect(cx - 2, boxY + 10, 4, boxHeight - 20);
 
-                // Draw Moving Bar
+                // Moving Attack Bar
                 ctx.fillStyle = '#FFFFFF';
                 if (gameState === 'DAMAGE_DISPLAY') {
-                    // Flash yellow/white if perfect hit
                     if (isPerfectHit && displayTimer % 10 > 5) ctx.fillStyle = '#FFFF00'; 
                     else if (displayTimer % 10 > 5) ctx.fillStyle = '#888888'; 
                 }
                 ctx.fillRect(attackBarX - 4, boxY + 5, 8, boxHeight - 10);
 
-                // Draw Damage Number above Enemy
+                // Damage Numbers
                 if (gameState === 'DAMAGE_DISPLAY') {
                     ctx.textAlign = 'center';
                     ctx.font = `40px ${globalFont}`;
                     if (attackDamage === 0) {
                         ctx.fillStyle = '#AAAAAA';
-                        ctx.fillText('MISS', cx, enemyY - 30 - (60 - displayTimer) * 0.5); // Floats up slightly
+                        ctx.fillText('MISS', cx, enemyY - 30 - (60 - displayTimer) * 0.5);
                     } else {
                         ctx.fillStyle = '#FF0000';
                         ctx.fillText(attackDamage, cx, enemyY - 30 - (60 - displayTimer) * 0.5);
@@ -281,7 +416,7 @@
                 }
             }
 
-            // HUD / Player Stats Update
+            // HUD / Player Stats Bar
             const hudY = boxY + boxHeight + 20;
             
             ctx.fillStyle = '#FFFFFF';
@@ -289,18 +424,18 @@
             ctx.font = `24px ${globalFont}`;
             ctx.fillText('PLAYER   LV 19   HP', boxX, hudY);
 
-            // HP Bar Background (Red)
+            // HP Bar (Red BG)
             const hpBarX = boxX + 205;
             const hpBarWidth = 40; 
             ctx.fillStyle = '#FF0000';
             ctx.fillRect(hpBarX, hudY + 5, hpBarWidth, 20);
 
-            // HP Bar Foreground (Yellow)
+            // HP Bar (Yellow FG)
             ctx.fillStyle = '#FFFF00';
             const currentHpWidth = hpBarWidth * (playerHP / playerMaxHP);
             ctx.fillRect(hpBarX, hudY + 5, currentHpWidth, 20);
 
-            // HP Numbers
+            // HP Text
             ctx.fillStyle = '#FFFFFF';
             ctx.fillText(`${playerHP} / ${playerMaxHP}`, hpBarX + hpBarWidth + 15, hudY);
 
@@ -320,7 +455,8 @@
             for (let i = 0; i < buttons.length; i++) {
                 const x = startX + (i * (btnW + totalSpacing));
                 
-                if (battleSelection === i && (gameState === 'BATTLE' || gameState === 'FIGHT_SELECT')) {
+                // Highlight active action button
+                if (battleSelection === i && ['BATTLE', 'FIGHT_SELECT', 'ACT_SELECT', 'ACT_OPTIONS', 'MERCY_SELECT'].includes(gameState)) {
                     ctx.strokeStyle = '#FFFF00'; 
                     ctx.fillStyle = '#FFFF00';   
                 } else {
@@ -343,7 +479,7 @@
                 drawMenu();
             } else if (gameState === 'KEYBINDS') {
                 drawKeybinds();
-            } else if (gameState === 'BATTLE' || gameState === 'FIGHT_SELECT' || gameState === 'ATTACKING' || gameState === 'DAMAGE_DISPLAY') {
+            } else {
                 drawBattle();
             }
 
