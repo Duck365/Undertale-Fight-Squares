@@ -13,7 +13,7 @@
             width: 100%;
             height: 100%;
             background-color: #000;
-            overflow: hidden; /* Prevents scrollbars */
+            overflow: hidden; 
             color: white;
             font-family: 'VT323', monospace;
         }
@@ -31,7 +31,6 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Make canvas fill the screen
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -40,10 +39,23 @@
         resizeCanvas();
 
         // Game State Variables
-        let gameState = 'MENU'; 
-        let menuSelection = 0;   // 0 = START, 1 = KEYBINDS
-        let battleSelection = 0; // 0 = FIGHT, 1 = ACT, 2 = ITEM, 3 = MERCY
+        let gameState = 'MENU'; // MENU, KEYBINDS, BATTLE, FIGHT_SELECT, ATTACKING, DAMAGE_DISPLAY
+        let menuSelection = 0;   
+        let battleSelection = 0; 
         const globalFont = '"VT323", monospace';
+
+        // Entity Stats
+        let redSquareMaxHP = 3600;
+        let redSquareHP = 3600;
+        let playerMaxHP = 92;
+        let playerHP = 92;
+
+        // Attack Bar Variables
+        let attackBarX = 0;
+        let attackBarSpeed = 12;
+        let attackDamage = 0;
+        let displayTimer = 0;
+        let isPerfectHit = false;
 
         // Input Handling
         window.addEventListener('keydown', (e) => {
@@ -51,7 +63,6 @@
 
             if (gameState === 'MENU') {
                 if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
-                    // Toggle between 0 and 1
                     menuSelection = menuSelection === 0 ? 1 : 0;
                 }
                 if (key === 'z' || key === 'enter') {
@@ -60,9 +71,7 @@
                 }
             } 
             else if (gameState === 'KEYBINDS') {
-                if (key === 'x' || key === 'shift') {
-                    gameState = 'MENU'; // Deselect / Return
-                }
+                if (key === 'x' || key === 'shift') gameState = 'MENU'; 
             } 
             else if (gameState === 'BATTLE') {
                 if (key === 'arrowleft') {
@@ -71,9 +80,71 @@
                 if (key === 'arrowright') {
                     battleSelection = (battleSelection < 3) ? battleSelection + 1 : 0;
                 }
-                // No selection functionality added yet per instructions
+                if (key === 'z' || key === 'enter') {
+                    if (battleSelection === 0) gameState = 'FIGHT_SELECT'; // Select FIGHT
+                }
+            }
+            else if (gameState === 'FIGHT_SELECT') {
+                if (key === 'x' || key === 'shift') {
+                    gameState = 'BATTLE'; // Go back to main battle menu
+                }
+                if (key === 'z' || key === 'enter') {
+                    // Start Attack Sequence
+                    gameState = 'ATTACKING';
+                    attackBarX = (canvas.width / 2) - 270; // Start at left edge of the box
+                }
+            }
+            else if (gameState === 'ATTACKING') {
+                if (key === 'z' || key === 'enter') {
+                    // Stop bar and calculate damage
+                    const cx = canvas.width / 2;
+                    const distance = Math.abs(attackBarX - cx);
+                    
+                    // Damage Scaling based on distance from center
+                    if (distance <= 15) {
+                        attackDamage = 180; // Perfect Hit (180 degrees)
+                        isPerfectHit = true;
+                    } else if (distance <= 75) {
+                        attackDamage = 90; // Good Hit (Right Angle)
+                        isPerfectHit = false;
+                    } else if (distance <= 200) {
+                        attackDamage = 20; // Weak Hit
+                        isPerfectHit = false;
+                    } else {
+                        attackDamage = 0; // Miss
+                        isPerfectHit = false;
+                    }
+
+                    redSquareHP -= attackDamage;
+                    if (redSquareHP < 0) redSquareHP = 0;
+
+                    gameState = 'DAMAGE_DISPLAY';
+                    displayTimer = 60; // Show damage for 60 frames (~1 second)
+                }
             }
         });
+
+        // Logic Update Loop
+        function update() {
+            if (gameState === 'ATTACKING') {
+                attackBarX += attackBarSpeed;
+                const boxRightEdge = (canvas.width / 2) + 270;
+                
+                // If bar goes past the box, it's a miss
+                if (attackBarX > boxRightEdge) {
+                    attackDamage = 0;
+                    isPerfectHit = false;
+                    gameState = 'DAMAGE_DISPLAY';
+                    displayTimer = 60;
+                }
+            } else if (gameState === 'DAMAGE_DISPLAY') {
+                displayTimer--;
+                if (displayTimer <= 0) {
+                    // End of turn logic will go here. For now, return to BATTLE menu.
+                    gameState = 'BATTLE';
+                }
+            }
+        }
 
         // Drawing Functions
         function drawMenu() {
@@ -84,11 +155,9 @@
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
-            // Title
             ctx.font = `60px ${globalFont}`;
             ctx.fillText('UNDERTALE: SQUARES', cx, cy - 150);
 
-            // Menu Buttons (START & KEYBINDS)
             const options = ['START', 'KEYBINDS'];
             const btnWidth = 200;
             const btnHeight = 60;
@@ -99,7 +168,7 @@
                 const btnY = startY + (i * spacing);
                 
                 if (menuSelection === i) {
-                    ctx.strokeStyle = '#FFFF00'; // Highlight selected
+                    ctx.strokeStyle = '#FFFF00'; 
                     ctx.fillStyle = '#FFFF00';
                 } else {
                     ctx.strokeStyle = '#FFFFFF';
@@ -139,7 +208,7 @@
             const cx = canvas.width / 2;
             const cy = canvas.height / 2;
 
-            // 1. The Battle Box (Centered)
+            // Battle Box
             const boxWidth = 560;
             const boxHeight = 160;
             const boxX = cx - (boxWidth / 2);
@@ -149,29 +218,97 @@
             ctx.lineWidth = 4;
             ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
 
-            // 2. The Enemy (Moved closer to the top of the battle box)
+            // Enemy
             const enemySize = 80;
+            const enemyX = cx - (enemySize / 2);
+            const enemyY = boxY - enemySize - 10;
             ctx.fillStyle = '#FF0000';
-            ctx.fillRect(cx - (enemySize / 2), boxY - enemySize - 10, enemySize, enemySize);
+            ctx.fillRect(enemyX, enemyY, enemySize, enemySize);
 
-            // 3. Battle Text inside the box
+            // Health Bar Above Enemy (Optional, visible for debugging/style)
+            ctx.fillStyle = '#FF0000';
+            ctx.fillRect(cx - 40, enemyY - 15, 80, 5);
+            ctx.fillStyle = '#00FF00';
+            ctx.fillRect(cx - 40, enemyY - 15, 80 * (redSquareHP / redSquareMaxHP), 5);
+
+            // Text/Graphics inside the box depending on state
             ctx.fillStyle = '#FFFFFF';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
             ctx.font = `32px ${globalFont}`;
-            ctx.fillText('* A geometrical shape has approached you.', boxX + 30, boxY + 30);
 
-            // 4. HUD / Player Stats
+            if (gameState === 'BATTLE') {
+                ctx.fillText('* A geometrical shape has approached you.', boxX + 30, boxY + 30);
+            } 
+            else if (gameState === 'FIGHT_SELECT') {
+                ctx.fillText('* Red Square', boxX + 50, boxY + 30);
+                // Simple selector heart indicator
+                ctx.fillStyle = '#FF0000';
+                ctx.fillText('♥', boxX + 25, boxY + 30);
+            }
+            else if (gameState === 'ATTACKING' || gameState === 'DAMAGE_DISPLAY') {
+                // Draw Attack Reticle (Eye shape)
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.ellipse(cx, boxY + (boxHeight / 2), boxWidth / 2 - 20, boxHeight / 2 - 20, 0, 0, 2 * Math.PI);
+                ctx.stroke();
+
+                // Draw Center target line
+                ctx.fillStyle = '#00FF00';
+                ctx.fillRect(cx - 2, boxY + 10, 4, boxHeight - 20);
+
+                // Draw Moving Bar
+                ctx.fillStyle = '#FFFFFF';
+                if (gameState === 'DAMAGE_DISPLAY') {
+                    // Flash yellow/white if perfect hit
+                    if (isPerfectHit && displayTimer % 10 > 5) ctx.fillStyle = '#FFFF00'; 
+                    else if (displayTimer % 10 > 5) ctx.fillStyle = '#888888'; 
+                }
+                ctx.fillRect(attackBarX - 4, boxY + 5, 8, boxHeight - 10);
+
+                // Draw Damage Number above Enemy
+                if (gameState === 'DAMAGE_DISPLAY') {
+                    ctx.textAlign = 'center';
+                    ctx.font = `40px ${globalFont}`;
+                    if (attackDamage === 0) {
+                        ctx.fillStyle = '#AAAAAA';
+                        ctx.fillText('MISS', cx, enemyY - 30 - (60 - displayTimer) * 0.5); // Floats up slightly
+                    } else {
+                        ctx.fillStyle = '#FF0000';
+                        ctx.fillText(attackDamage, cx, enemyY - 30 - (60 - displayTimer) * 0.5);
+                    }
+                }
+            }
+
+            // HUD / Player Stats Update
+            const hudY = boxY + boxHeight + 20;
+            
+            ctx.fillStyle = '#FFFFFF';
+            ctx.textAlign = 'left';
             ctx.font = `24px ${globalFont}`;
-            ctx.fillText('PLAYER   LV 19   HP 92/92', boxX, boxY + boxHeight + 25);
+            ctx.fillText('PLAYER   LV 19   HP', boxX, hudY);
 
-            // 5. Action Buttons (FIGHT, ACT, ITEM, MERCY)
+            // HP Bar Background (Red)
+            const hpBarX = boxX + 205;
+            const hpBarWidth = 40; 
+            ctx.fillStyle = '#FF0000';
+            ctx.fillRect(hpBarX, hudY + 5, hpBarWidth, 20);
+
+            // HP Bar Foreground (Yellow)
+            ctx.fillStyle = '#FFFF00';
+            const currentHpWidth = hpBarWidth * (playerHP / playerMaxHP);
+            ctx.fillRect(hpBarX, hudY + 5, currentHpWidth, 20);
+
+            // HP Numbers
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillText(`${playerHP} / ${playerMaxHP}`, hpBarX + hpBarWidth + 15, hudY);
+
+            // Action Buttons
             const buttons = ['FIGHT', 'ACT', 'ITEM', 'MERCY'];
-            const btnY = boxY + boxHeight + 70;
+            const btnY = hudY + 45;
             const btnW = 120;
             const btnH = 45;
-            
-            // Calculate total width of all buttons to center them as a group
             const totalSpacing = 20; 
             const totalWidth = (btnW * 4) + (totalSpacing * 3);
             const startX = cx - (totalWidth / 2);
@@ -183,7 +320,7 @@
             for (let i = 0; i < buttons.length; i++) {
                 const x = startX + (i * (btnW + totalSpacing));
                 
-                if (battleSelection === i) {
+                if (battleSelection === i && (gameState === 'BATTLE' || gameState === 'FIGHT_SELECT')) {
                     ctx.strokeStyle = '#FFFF00'; 
                     ctx.fillStyle = '#FFFF00';   
                 } else {
@@ -197,23 +334,22 @@
         }
 
         function gameLoop() {
-            // Clear screen
+            update();
+
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Render current state
             if (gameState === 'MENU') {
                 drawMenu();
             } else if (gameState === 'KEYBINDS') {
                 drawKeybinds();
-            } else if (gameState === 'BATTLE') {
+            } else if (gameState === 'BATTLE' || gameState === 'FIGHT_SELECT' || gameState === 'ATTACKING' || gameState === 'DAMAGE_DISPLAY') {
                 drawBattle();
             }
 
             requestAnimationFrame(gameLoop);
         }
 
-        // Start game loop
         gameLoop();
     </script>
 </body>
