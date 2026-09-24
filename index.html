@@ -39,8 +39,6 @@
         resizeCanvas();
 
         // Game State Variables
-        // MENU, KEYBINDS, BATTLE, FIGHT_SELECT, ATTACKING, DAMAGE_DISPLAY, 
-        // ACT_SELECT, ACT_OPTIONS, ACT_TEXT, MERCY_SELECT, MERCY_TEXT, VICTORY
         let gameState = 'MENU'; 
         let menuSelection = 0;   
         let battleSelection = 0; 
@@ -67,6 +65,18 @@
         let displayTimer = 0;
         let isPerfectHit = false;
 
+        // Reset game state for a new run
+        function resetBattle() {
+            redSquareHP = redSquareMaxHP;
+            playerHP = playerMaxHP;
+            checkCount = 0;
+            pacifistProgress = 0;
+            canSpare = false;
+            battleSelection = 0;
+            actSelection = 0;
+            mercySelection = 0;
+        }
+
         // Input Handling
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
@@ -77,7 +87,10 @@
                     menuSelection = menuSelection === 0 ? 1 : 0;
                 }
                 if (key === 'z' || key === 'enter') {
-                    if (menuSelection === 0) gameState = 'BATTLE';
+                    if (menuSelection === 0) {
+                        resetBattle();
+                        gameState = 'BATTLE';
+                    }
                     if (menuSelection === 1) gameState = 'KEYBINDS';
                 }
             } 
@@ -146,11 +159,15 @@
             else if (gameState === 'ACT_OPTIONS') {
                 if (key === 'x' || key === 'shift') gameState = 'ACT_SELECT';
                 
-                if (key === 'arrowleft' || key === 'arrowup') {
-                    actSelection = (actSelection > 0) ? actSelection - 1 : 2;
-                }
-                if (key === 'arrowright' || key === 'arrowdown') {
-                    actSelection = (actSelection < 2) ? actSelection + 1 : 0;
+                // True 2-Column Grid Navigation
+                if (key === 'arrowright') {
+                    if (actSelection === 0) actSelection = 1;
+                } else if (key === 'arrowleft') {
+                    if (actSelection === 1) actSelection = 0;
+                } else if (key === 'arrowdown') {
+                    if (actSelection === 0 || actSelection === 1) actSelection = 2;
+                } else if (key === 'arrowup') {
+                    if (actSelection === 2) actSelection = 0;
                 }
 
                 if (key === 'z' || key === 'enter') {
@@ -189,7 +206,7 @@
             else if (gameState === 'MERCY_SELECT') {
                 if (key === 'x' || key === 'shift') gameState = 'BATTLE';
 
-                if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
+                if (key === 'arrowup' || key === 'arrowdown') {
                     mercySelection = mercySelection === 0 ? 1 : 0;
                 }
 
@@ -235,7 +252,12 @@
             } else if (gameState === 'DAMAGE_DISPLAY') {
                 displayTimer--;
                 if (displayTimer <= 0) {
-                    gameState = 'BATTLE';
+                    if (redSquareHP <= 0) {
+                        currentBoxText = '* YOU WON!\n* You earned 50000 EXP and 0 gold.';
+                        gameState = 'VICTORY';
+                    } else {
+                        gameState = 'BATTLE';
+                    }
                 }
             }
         }
@@ -335,7 +357,7 @@
             ctx.font = `32px ${globalFont}`;
 
             if (gameState === 'BATTLE') {
-                ctx.fillText('* A geometrical shape has approached you.', boxX + 30, boxY + 30);
+                ctx.fillText('* Smells like a 90 degree angle.', boxX + 30, boxY + 30);
             } 
             else if (gameState === 'FIGHT_SELECT' || gameState === 'ACT_SELECT') {
                 if (canSpare) ctx.fillStyle = '#FFFF00';
