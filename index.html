@@ -42,8 +42,8 @@
         let gameState = 'MENU'; 
         let menuSelection = 0;   
         let battleSelection = 0; 
-        let actSelection = 0;    // 0 = Check, 1 = Doodle, 2 = Round Off
-        let mercySelection = 0;  // 0 = Spare, 1 = Flee
+        let actSelection = 0;    
+        let mercySelection = 0;  
         const globalFont = '"VT323", monospace';
 
         // Entity Stats
@@ -81,7 +81,6 @@
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
 
-            // --- MENU STATE ---
             if (gameState === 'MENU') {
                 if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
                     menuSelection = menuSelection === 0 ? 1 : 0;
@@ -94,11 +93,9 @@
                     if (menuSelection === 1) gameState = 'KEYBINDS';
                 }
             } 
-            // --- KEYBINDS STATE ---
             else if (gameState === 'KEYBINDS') {
                 if (key === 'x' || key === 'shift') gameState = 'MENU'; 
             } 
-            // --- MAIN BATTLE MENU ---
             else if (gameState === 'BATTLE') {
                 if (key === 'arrowleft') {
                     battleSelection = (battleSelection > 0) ? battleSelection - 1 : 3;
@@ -112,7 +109,6 @@
                     if (battleSelection === 3) gameState = 'MERCY_SELECT';
                 }
             }
-            // --- FIGHT TARGET SELECT ---
             else if (gameState === 'FIGHT_SELECT') {
                 if (key === 'x' || key === 'shift') gameState = 'BATTLE';
                 if (key === 'z' || key === 'enter') {
@@ -120,7 +116,6 @@
                     attackBarX = (canvas.width / 2) - 270;
                 }
             }
-            // --- ATTACK MINIGAME ---
             else if (gameState === 'ATTACKING') {
                 if (key === 'z' || key === 'enter') {
                     const cx = canvas.width / 2;
@@ -147,7 +142,6 @@
                     displayTimer = 60;
                 }
             }
-            // --- ACT TARGET SELECT ---
             else if (gameState === 'ACT_SELECT') {
                 if (key === 'x' || key === 'shift') gameState = 'BATTLE';
                 if (key === 'z' || key === 'enter') {
@@ -155,11 +149,9 @@
                     actSelection = 0;
                 }
             }
-            // --- ACT OPTIONS MENU ---
             else if (gameState === 'ACT_OPTIONS') {
                 if (key === 'x' || key === 'shift') gameState = 'ACT_SELECT';
                 
-                // True 2-Column Grid Navigation
                 if (key === 'arrowright') {
                     if (actSelection === 0) actSelection = 1;
                 } else if (key === 'arrowleft') {
@@ -172,7 +164,6 @@
 
                 if (key === 'z' || key === 'enter') {
                     if (actSelection === 0) {
-                        // CHECK
                         if (checkCount === 0) {
                             currentBoxText = '* RED SQUARE - 3600 HP 10 DEF\n* A perfectly balanced shape.';
                         } else {
@@ -181,12 +172,10 @@
                         checkCount++;
                     } 
                     else if (actSelection === 1) {
-                        // DOODLE
                         pacifistProgress++;
                         currentBoxText = '* You drew squiggly lines outside the grid.\n* Red Square looks disturbed by the sudden asymmetry!';
                     } 
                     else if (actSelection === 2) {
-                        // ROUND OFF
                         pacifistProgress++;
                         currentBoxText = '* You attempted to sand down Red Square\'s sharp 90 degree corners.\n* Its sharp outline softened slightly!';
                     }
@@ -198,11 +187,9 @@
                     gameState = 'ACT_TEXT';
                 }
             }
-            // --- ACT TEXT DISPLAY ---
             else if (gameState === 'ACT_TEXT') {
                 if (key === 'z' || key === 'enter') gameState = 'BATTLE';
             }
-            // --- MERCY MENU ---
             else if (gameState === 'MERCY_SELECT') {
                 if (key === 'x' || key === 'shift') gameState = 'BATTLE';
 
@@ -212,7 +199,6 @@
 
                 if (key === 'z' || key === 'enter') {
                     if (mercySelection === 0) {
-                        // SPARE
                         if (canSpare) {
                             currentBoxText = '* YOU WON!\n* You earned 0 EXP and 0 gold.';
                             gameState = 'VICTORY';
@@ -221,17 +207,14 @@
                             gameState = 'MERCY_TEXT';
                         }
                     } else if (mercySelection === 1) {
-                        // FLEE
                         currentBoxText = '* Escaping is not an option.';
                         gameState = 'MERCY_TEXT';
                     }
                 }
             }
-            // --- MERCY TEXT DISPLAY ---
             else if (gameState === 'MERCY_TEXT') {
                 if (key === 'z' || key === 'enter') gameState = 'BATTLE';
             }
-            // --- VICTORY STATE ---
             else if (gameState === 'VICTORY') {
                 if (key === 'z' || key === 'enter') gameState = 'MENU';
             }
@@ -259,6 +242,33 @@
                         gameState = 'BATTLE';
                     }
                 }
+            }
+        }
+
+        // Text Wrapping Helper Function
+        function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
+            const paragraphs = text.split('\n');
+            let cursorY = y;
+            
+            for (let i = 0; i < paragraphs.length; i++) {
+                const words = paragraphs[i].split(' ');
+                let line = '';
+                
+                for (let j = 0; j < words.length; j++) {
+                    const testLine = line + words[j] + ' ';
+                    const metrics = ctx.measureText(testLine);
+                    
+                    if (metrics.width > maxWidth && j > 0) {
+                        ctx.fillText(line, x, cursorY);
+                        // Indent the wrapped line if the paragraph started with an asterisk
+                        line = (paragraphs[i].startsWith('*') ? '  ' : '') + words[j] + ' ';
+                        cursorY += lineHeight;
+                    } else {
+                        line = testLine;
+                    }
+                }
+                ctx.fillText(line, x, cursorY);
+                cursorY += lineHeight;
             }
         }
 
@@ -324,17 +334,19 @@
             const cx = canvas.width / 2;
             const cy = canvas.height / 2;
 
-            // Battle Box
             const boxWidth = 560;
             const boxHeight = 160;
             const boxX = cx - (boxWidth / 2);
             const boxY = cy - 20;
+            
+            // Text constraints inside the box
+            const textMaxWidth = boxWidth - 60; 
+            const textLineHeight = 40;
 
             ctx.strokeStyle = '#FFFFFF';
             ctx.lineWidth = 4;
             ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
 
-            // Enemy Sprite
             const enemySize = 80;
             const enemyX = cx - (enemySize / 2);
             const enemyY = boxY - enemySize - 10;
@@ -343,21 +355,19 @@
                 ctx.fillStyle = '#FF0000';
                 ctx.fillRect(enemyX, enemyY, enemySize, enemySize);
 
-                // Enemy HP Bar
                 ctx.fillStyle = '#FF0000';
                 ctx.fillRect(cx - 40, enemyY - 15, 80, 5);
                 ctx.fillStyle = '#00FF00';
                 ctx.fillRect(cx - 40, enemyY - 15, 80 * (redSquareHP / redSquareMaxHP), 5);
             }
 
-            // Box Text & Sub-menu Rendering
             ctx.fillStyle = '#FFFFFF';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
             ctx.font = `32px ${globalFont}`;
 
             if (gameState === 'BATTLE') {
-                ctx.fillText('* Smells like a 90 degree angle.', boxX + 30, boxY + 30);
+                drawWrappedText(ctx, '* Smells like a 90 degree angle.', boxX + 30, boxY + 30, textMaxWidth, textLineHeight);
             } 
             else if (gameState === 'FIGHT_SELECT' || gameState === 'ACT_SELECT') {
                 if (canSpare) ctx.fillStyle = '#FFFF00';
@@ -387,10 +397,7 @@
                 }
             }
             else if (gameState === 'ACT_TEXT' || gameState === 'MERCY_TEXT' || gameState === 'VICTORY') {
-                const lines = currentBoxText.split('\n');
-                for (let i = 0; i < lines.length; i++) {
-                    ctx.fillText(lines[i], boxX + 30, boxY + 30 + (i * 40));
-                }
+                drawWrappedText(ctx, currentBoxText, boxX + 30, boxY + 30, textMaxWidth, textLineHeight);
             }
             else if (gameState === 'MERCY_SELECT') {
                 if (canSpare) ctx.fillStyle = '#FFFF00';
@@ -405,18 +412,15 @@
                 ctx.fillText('♥', boxX + 25, heartY);
             }
             else if (gameState === 'ATTACKING' || gameState === 'DAMAGE_DISPLAY') {
-                // Target Reticle
                 ctx.strokeStyle = '#FFFFFF';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.ellipse(cx, boxY + (boxHeight / 2), boxWidth / 2 - 20, boxHeight / 2 - 20, 0, 0, 2 * Math.PI);
                 ctx.stroke();
 
-                // Target Line
                 ctx.fillStyle = '#00FF00';
                 ctx.fillRect(cx - 2, boxY + 10, 4, boxHeight - 20);
 
-                // Moving Attack Bar
                 ctx.fillStyle = '#FFFFFF';
                 if (gameState === 'DAMAGE_DISPLAY') {
                     if (isPerfectHit && displayTimer % 10 > 5) ctx.fillStyle = '#FFFF00'; 
@@ -424,7 +428,6 @@
                 }
                 ctx.fillRect(attackBarX - 4, boxY + 5, 8, boxHeight - 10);
 
-                // Damage Numbers
                 if (gameState === 'DAMAGE_DISPLAY') {
                     ctx.textAlign = 'center';
                     ctx.font = `40px ${globalFont}`;
@@ -438,7 +441,7 @@
                 }
             }
 
-            // HUD / Player Stats Bar
+            // HUD
             const hudY = boxY + boxHeight + 20;
             
             ctx.fillStyle = '#FFFFFF';
@@ -446,18 +449,15 @@
             ctx.font = `24px ${globalFont}`;
             ctx.fillText('PLAYER   LV 19   HP', boxX, hudY);
 
-            // HP Bar (Red BG)
             const hpBarX = boxX + 205;
             const hpBarWidth = 40; 
             ctx.fillStyle = '#FF0000';
             ctx.fillRect(hpBarX, hudY + 5, hpBarWidth, 20);
 
-            // HP Bar (Yellow FG)
             ctx.fillStyle = '#FFFF00';
             const currentHpWidth = hpBarWidth * (playerHP / playerMaxHP);
             ctx.fillRect(hpBarX, hudY + 5, currentHpWidth, 20);
 
-            // HP Text
             ctx.fillStyle = '#FFFFFF';
             ctx.fillText(`${playerHP} / ${playerMaxHP}`, hpBarX + hpBarWidth + 15, hudY);
 
@@ -477,7 +477,6 @@
             for (let i = 0; i < buttons.length; i++) {
                 const x = startX + (i * (btnW + totalSpacing));
                 
-                // Highlight active action button
                 if (battleSelection === i && ['BATTLE', 'FIGHT_SELECT', 'ACT_SELECT', 'ACT_OPTIONS', 'MERCY_SELECT'].includes(gameState)) {
                     ctx.strokeStyle = '#FFFF00'; 
                     ctx.fillStyle = '#FFFF00';   
